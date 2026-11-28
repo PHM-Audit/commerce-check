@@ -87,8 +87,17 @@ def check_order(order: dict, feed: dict = None) -> list:
     currency = order.get("currency")
     for i, it in enumerate(items):
         iid = str(it.get("product_id", it.get("id", f"item{i}")))
+        # price resolution: top-level unit_price/price, then UCP nested forms (item.price, dish.price)
         price = it.get("unit_price", it.get("price"))
+        if not isinstance(price, (int, float)):
+            for _k in ("item", "dish", "product"):
+                _n = it.get(_k)
+                if isinstance(_n, dict) and isinstance(_n.get("price"), (int, float)):
+                    price = _n["price"]; break
+        # quantity: scalar, or UCP structured {original,total,fulfilled} -> use total
         q = it.get("quantity", 1)
+        if isinstance(q, dict):
+            q = q.get("total", q.get("original"))
         if not isinstance(price, (int, float)) or not isinstance(q, (int, float)) or q <= 0:
             out.append(_v("ORDER_ITEM_MALFORMED", "FAIL", f"items[{i}]", f"price={price!r} qty={q!r}", oid))
             continue
